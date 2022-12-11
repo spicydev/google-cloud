@@ -1,0 +1,18 @@
+spring:
+  sql:
+    init:
+      mode: NEVER
+  cloud:
+    gcp:
+      pubsub:
+        enabled: true
+        emulator-host: localhost:8085
+        project-id: mirchi-dev
+      spanner:
+        enabled: true
+        project-id: mirchi-dev
+        instance-id: dev-inst
+        database: dev-db
+        emulator:
+          enabled: true
+        emulator-host: localhost:9010
