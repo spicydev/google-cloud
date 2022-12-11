@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+
+  google-cloud:
+    image: google-cloud:0.0.1
+    depends_on:
+      - pubsub-emulator
+      - spanner-emulator
+    environment:
+      - SPANNER_EMULATOR_HOST=varmadocker:9010
+      - PUBSUB_EMULATOR_HOST=varmadocker:8085
+    ports:
+      - "8080:8080"
+    networks:
+      - hostnet
+      - default
+  spanner-emulator:
+    image: gcr.io/cloud-spanner-emulator/emulator
+    ports:
+      - "9010:9010"
+      - "9020:9020"
+    networks:
+      - default
+      - hostnet
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
+    entrypoint: gcloud beta emulators pubsub start --project mirchi-dev --host-port 0.0.0.0:8085
+    environment:
+      - PUBSUB_PROJECT_ID=mirchi-dev
+    ports:
+      - "8085:8085"
+    networks:
+      - default
+      - hostnet
+
+networks:
+  hostnet:
+    external: true
+    name: varmadocker
