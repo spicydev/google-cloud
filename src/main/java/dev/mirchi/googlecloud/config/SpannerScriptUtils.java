@@ -1,5 +1,7 @@
 package dev.mirchi.googlecloud.config;
 
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spring.data.spanner.core.SpannerTemplate;
 import com.google.cloud.spring.data.spanner.core.admin.SpannerDatabaseAdminTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,10 +12,6 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.io.LineNumberReader;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.SQLWarning;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,14 +20,14 @@ public class SpannerScriptUtils extends ScriptUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(SpannerScriptUtils.class);
 
-    public static void executeSqlScript(SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate, EncodedResource resource, boolean continueOnError,
-                                        boolean ignoreFailedDrops, String[] commentPrefixes, @Nullable String separator,
-                                        String blockCommentStartDelimiter, String blockCommentEndDelimiter) throws ScriptException {
+    public static void executeDdlDmlScript(SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate, SpannerTemplate spannerTemplate,
+                                           EncodedResource resource, boolean continueOnError,
+                                           boolean ignoreFailedDrops, String[] commentPrefixes, @Nullable String separator,
+                                           String blockCommentStartDelimiter, String blockCommentEndDelimiter,
+                                           boolean isDdlScript) throws ScriptException {
 
         try {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Executing SQL script from " + resource);
-            }
+            logger.info("Executing SQL script from " + resource);
             long startTime = System.currentTimeMillis();
 
             String script;
@@ -54,50 +52,28 @@ public class SpannerScriptUtils extends ScriptUtils {
                     blockCommentEndDelimiter, statements);
 
             int stmtNumber = 0;
-            try {
-                for (String statement : statements) {
-                    stmtNumber++;
-                    try {
-//                        stmt.execute(statement);
-                        spannerDatabaseAdminTemplate.executeDdlStrings(Collections.singletonList(statement), false);
-//                        int rowsAffected = stmt.getUpdateCount();
-//                        if (logger.isDebugEnabled()) {
-//                            logger.debug(rowsAffected + " returned as update count for SQL: " + statement);
-//                            SQLWarning warningToLog = stmt.getWarnings();
-//                            while (warningToLog != null) {
-//                                logger.debug("SQLWarning ignored: SQL state '" + warningToLog.getSQLState() +
-//                                        "', error code '" + warningToLog.getErrorCode() +
-//                                        "', message [" + warningToLog.getMessage() + "]");
-//                                warningToLog = warningToLog.getNextWarning();
-//                            }
-//                        }
+            for (String statement : statements) {
+                stmtNumber++;
+                try {
+                    if (isDdlScript) {
+                        spannerDatabaseAdminTemplate.executeDdlStrings(Collections.singletonList(statement), true);
+                    } else {
+                        spannerTemplate.executeDmlStatement(Statement.of(statement));
                     }
-                    catch (Exception ex) {
-                        boolean dropStatement = StringUtils.startsWithIgnoreCase(statement.trim(), "drop");
-                        if (continueOnError || (dropStatement && ignoreFailedDrops)) {
-                            if (logger.isDebugEnabled()) {
-                                logger.debug(ScriptStatementFailedException.buildErrorMessage(statement, stmtNumber, resource), ex);
-                            }
-                        }
-                        else {
-                            throw new ScriptStatementFailedException(statement, stmtNumber, resource, ex);
-                        }
+                }
+                catch (Exception ex) {
+                    boolean dropStatement = StringUtils.startsWithIgnoreCase(statement.trim(), "drop");
+                    if (continueOnError || (dropStatement && ignoreFailedDrops)) {
+                        logger.error(ScriptStatementFailedException.buildErrorMessage(statement, stmtNumber, resource), ex);
+                    }
+                    else {
+                        throw new ScriptStatementFailedException(statement, stmtNumber, resource, ex);
                     }
                 }
             }
-            finally {
-//                try {
-//                    stmt.close();
-//                }
-//                catch (Throwable ex) {
-//                    logger.trace("Could not close JDBC Statement", ex);
-//                }
-            }
 
             long elapsedTime = System.currentTimeMillis() - startTime;
-            if (logger.isDebugEnabled()) {
-                logger.debug("Executed SQL script from " + resource + " in " + elapsedTime + " ms.");
-            }
+            logger.info("Executed SQL script from " + resource + " in " + elapsedTime + " ms.");
         }
         catch (Exception ex) {
             if (ex instanceof ScriptException) {
@@ -142,7 +118,6 @@ public class SpannerScriptUtils extends ScriptUtils {
                     int indexOfNextNewline = script.indexOf('\n', i);
                     if (indexOfNextNewline > i) {
                         i = indexOfNextNewline;
-                        continue;
                     }
                     else {
                         // If there's no EOL, we must be at the end of the script, so stop here.
@@ -154,7 +129,6 @@ public class SpannerScriptUtils extends ScriptUtils {
                     int indexOfCommentEnd = script.indexOf(blockCommentEndDelimiter, i);
                     if (indexOfCommentEnd > i) {
                         i = indexOfCommentEnd + blockCommentEndDelimiter.length() - 1;
-                        continue;
                     }
                     else {
                         throw new ScriptParseException(

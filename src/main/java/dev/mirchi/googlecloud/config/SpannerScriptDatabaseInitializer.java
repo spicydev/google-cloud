@@ -2,6 +2,7 @@ package dev.mirchi.googlecloud.config;
 
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spring.data.spanner.core.SpannerTemplate;
 import com.google.cloud.spring.data.spanner.core.admin.SpannerDatabaseAdminTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,7 @@ import org.springframework.boot.sql.init.DatabaseInitializationSettings;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.EncodedResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.jdbc.datasource.init.UncategorizedScriptException;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -21,7 +23,11 @@ public class SpannerScriptDatabaseInitializer extends AbstractScriptDatabaseInit
 
     private final SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate;
 
+    private final SpannerTemplate spannerTemplate;
+
     private final SpannerOptions spannerOptions;
+
+    private final DatabaseInitializationSettings settings;
 
     /**
      * Creates a new {@link AbstractScriptDatabaseInitializer} that will initialize the
@@ -30,19 +36,30 @@ public class SpannerScriptDatabaseInitializer extends AbstractScriptDatabaseInit
      * @param settings initialization settings
      */
     public SpannerScriptDatabaseInitializer(SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate,
+                                            SpannerTemplate spannerTemplate,
                                             SpannerOptions spannerOptions,
                                             DatabaseInitializationSettings settings) {
         super(settings);
         this.spannerDatabaseAdminTemplate = spannerDatabaseAdminTemplate;
+        this.spannerTemplate = spannerTemplate;
         this.spannerOptions = spannerOptions;
+        this.settings = settings;
     }
 
     public SpannerDatabaseAdminTemplate getDatabaseAdminTemplate() {
         return spannerDatabaseAdminTemplate;
     }
 
+    public SpannerTemplate getSpannerTemplate() {
+        return spannerTemplate;
+    }
+
     public SpannerOptions getSpannerOptions() {
         return spannerOptions;
+    }
+
+    public DatabaseInitializationSettings getSettings() {
+        return settings;
     }
 
     @Override
@@ -59,11 +76,15 @@ public class SpannerScriptDatabaseInitializer extends AbstractScriptDatabaseInit
     @Override
     protected void runScripts(List<Resource> resources, boolean continueOnError, String separator, Charset encoding) {
         for (Resource resource : resources) {
-            log.info("Database Resources INIT Mode: "+ resource.getFilename());
+            if (Objects.isNull(resource)) {
+                throw new UncategorizedScriptException(
+                        "Failed to execute database script due to NULL resource [" + resource + "]");
+            }
             EncodedResource encodedScript = new EncodedResource(resource, Charset.defaultCharset());
-            SpannerScriptUtils.executeSqlScript(spannerDatabaseAdminTemplate, encodedScript, true,
+            SpannerScriptUtils.executeDdlDmlScript(spannerDatabaseAdminTemplate, spannerTemplate, encodedScript, true,
                     true, ScriptUtils.DEFAULT_COMMENT_PREFIXES, ScriptUtils.DEFAULT_STATEMENT_SEPARATOR,
-                    ScriptUtils.DEFAULT_BLOCK_COMMENT_START_DELIMITER, ScriptUtils.DEFAULT_BLOCK_COMMENT_END_DELIMITER);
+                    ScriptUtils.DEFAULT_BLOCK_COMMENT_START_DELIMITER, ScriptUtils.DEFAULT_BLOCK_COMMENT_END_DELIMITER,
+                    settings.getSchemaLocations().stream().anyMatch(location -> location.contains(resource.getFilename())));
         }
     }
 }
