@@ -1,0 +1,2 @@
+org.springframework.boot.sql.init.dependency.DatabaseInitializerDetector=\
+dev.mirchi.googlecloud.config.SpannerScriptDatabaseInitializerDetector

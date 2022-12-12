@@ -1,12 +1,12 @@
 spring:
   sql:
     init:
-      mode: NEVER
+      mode: EMBEDDED
   cloud:
     gcp:
       pubsub:
         enabled: true
-        emulator-host: localhost:8085
+        emulator-host: host.docker.internal:8085
         project-id: mirchi-dev
       spanner:
         enabled: true
@@ -15,4 +15,4 @@ spring:
         database: dev-db
         emulator:
           enabled: true
-        emulator-host: localhost:9010
+        emulator-host: host.docker.internal:9010
