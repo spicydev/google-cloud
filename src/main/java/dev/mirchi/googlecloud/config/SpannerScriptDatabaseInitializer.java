@@ -1,27 +1,19 @@
 package dev.mirchi.googlecloud.config;
 
-import com.google.cloud.spring.autoconfigure.core.GcpContextAutoConfiguration;
-import com.google.cloud.spring.autoconfigure.spanner.GcpSpannerAutoConfiguration;
-import com.google.cloud.spring.data.spanner.core.admin.SpannerDatabaseAdminTemplate;
+import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer;
 import org.springframework.boot.sql.init.DatabaseInitializationSettings;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Component;
-
 import java.nio.charset.Charset;
 import java.util.List;
 
-@Component
-@AutoConfigureAfter({GcpSpannerAutoConfiguration.class})
 public class SpannerScriptDatabaseInitializer extends AbstractScriptDatabaseInitializer {
 
     private static final Logger log = LoggerFactory.getLogger(SpannerScriptDatabaseInitializer.class);
 
-    private final SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate;
+    private final DatabaseAdminClient databaseAdminClient;
 
     /**
      * Creates a new {@link AbstractScriptDatabaseInitializer} that will initialize the
@@ -29,15 +21,26 @@ public class SpannerScriptDatabaseInitializer extends AbstractScriptDatabaseInit
      *
      * @param settings initialization settings
      */
-    public SpannerScriptDatabaseInitializer(SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate,
+    public SpannerScriptDatabaseInitializer(DatabaseAdminClient databaseAdminClient,
                                             DatabaseInitializationSettings settings) {
         super(settings);
-        this.spannerDatabaseAdminTemplate = spannerDatabaseAdminTemplate;
+        this.databaseAdminClient = databaseAdminClient;
     }
 
-    public SpannerDatabaseAdminTemplate getSpannerDatabaseAdminTemplate() {
-        return spannerDatabaseAdminTemplate;
+    public DatabaseAdminClient getDatabaseAdminTemplate() {
+        return databaseAdminClient;
     }
+
+    @Override
+	protected boolean isEmbeddedDatabase() {
+		try {
+			return false;
+		}
+		catch (Exception ex) {
+			log.error("Could not determine if datasource is embedded", ex);
+			return false;
+		}
+	}
 
     @Override
     protected void runScripts(List<Resource> resources, boolean continueOnError, String separator, Charset encoding) {

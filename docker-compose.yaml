@@ -1,40 +1,49 @@
 version: "3.8"
 
 services:
-
-  google-cloud:
-    image: google-cloud:0.0.1
-    depends_on:
-      - pubsub-emulator
-      - spanner-emulator
-    environment:
-      - SPANNER_EMULATOR_HOST=varmadocker:9010
-      - PUBSUB_EMULATOR_HOST=varmadocker:8085
-    ports:
-      - "8080:8080"
-    networks:
-      - hostnet
-      - default
   spanner-emulator:
-    image: gcr.io/cloud-spanner-emulator/emulator
+    image: gcr.io/cloud-spanner-emulator/emulator-arm64
+    # Optional Image for x86_64
+    # image: gcr.io/cloud-spanner-emulator/emulator
     ports:
       - "9010:9010"
       - "9020:9020"
-    networks:
-      - default
-      - hostnet
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
-    entrypoint: gcloud beta emulators pubsub start --project mirchi-dev --host-port 0.0.0.0:8085
+    platform: linux/x86_64
+    depends_on:
+      spanner-emulator:
+        condition: service_started
+    # entrypoint: gcloud beta emulators pubsub start --project $$GCP_PROJECT_ID --host-port 0.0.0.0:8085
+    command:
+      - /bin/bash
+      - -c
+      - |
+        gcloud config set auth/disable_credentials true
+        gcloud config set project $$GCP_PROJECT_ID
+        gcloud config set api_endpoint_overrides/spanner http://host.docker.internal:9020/
+        gcloud spanner instances create $$SPANNER_INSTANCE --config=emulator-config --description="Test Instance" --nodes=1
+        gcloud spanner databases create $$SPANNER_DATABASE --instance=$$SPANNER_INSTANCE --async --database-dialect=GOOGLE_STANDARD_SQL
+        gcloud beta emulators pubsub start --project $$GCP_PROJECT_ID --host-port 0.0.0.0:8085
     environment:
-      - PUBSUB_PROJECT_ID=mirchi-dev
+      - GCP_PROJECT_ID=mirchi-dev
+      - SPANNER_INSTANCE=dev-inst
+      - SPANNER_DATABASE=dev-db
     ports:
       - "8085:8085"
-    networks:
-      - default
-      - hostnet
-
-networks:
-  hostnet:
-    external: true
-    name: varmadocker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/"]
+      interval: 60s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+  google-cloud:
+    image: google-cloud:0.0.1
+    depends_on:
+      pubsub-emulator:
+        condition: service_healthy
+    environment:
+      - SPANNER_EMULATOR_HOST=host.docker.internal:9010
+      - PUBSUB_EMULATOR_HOST=host.docker.internal:8085
+    ports:
+      - "8080:8080"
