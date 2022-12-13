@@ -1,4 +1,4 @@
-package dev.mirchi.googlecloud.config;
+package dev.mirchi.googlecloud.repository.init;
 
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spring.data.spanner.core.SpannerTemplate;
@@ -27,7 +27,7 @@ public class SpannerScriptUtils extends ScriptUtils {
                                            boolean isDdlScript) throws ScriptException {
 
         try {
-            logger.info("Executing SQL script from " + resource);
+            logger.debug("Executing SQL script from " + resource);
             long startTime = System.currentTimeMillis();
 
             String script;

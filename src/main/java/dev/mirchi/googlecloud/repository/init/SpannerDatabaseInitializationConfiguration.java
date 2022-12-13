@@ -1,9 +1,10 @@
-package dev.mirchi.googlecloud.config;
+package dev.mirchi.googlecloud.repository.init;
 
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spring.autoconfigure.spanner.GcpSpannerAutoConfiguration;
 import com.google.cloud.spring.data.spanner.core.SpannerTemplate;
 import com.google.cloud.spring.data.spanner.core.admin.SpannerDatabaseAdminTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.sql.init.SqlInitializationProperties;
 import org.springframework.boot.sql.init.DatabaseInitializationSettings;
@@ -12,29 +13,32 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(GcpSpannerAutoConfiguration.class)
 public class SpannerDatabaseInitializationConfiguration {
 
     @Bean
-    public SpannerScriptDatabaseInitializer spannerScriptDatabaseInitializer(SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate,
-                                                                             SpannerTemplate spannerTemplate,
-                                                                             SpannerOptions spannerOptions,
-                                                                             SqlInitializationProperties sqlInitializationProperties) {
+    public SpannerScriptDatabaseInitializer spannerScriptDatabaseInitializer(@Autowired SpannerDatabaseAdminTemplate spannerDatabaseAdminTemplate,
+                                                                             @Autowired SpannerTemplate spannerTemplate,
+                                                                             @Autowired SpannerOptions spannerOptions,
+                                                                             @Autowired(required = false) SqlInitializationProperties sqlInitializationProperties) {
         return new SpannerScriptDatabaseInitializer(spannerDatabaseAdminTemplate, spannerTemplate,
                 spannerOptions, createFrom(sqlInitializationProperties));
     }
 
     private static DatabaseInitializationSettings createFrom(SqlInitializationProperties properties) {
         DatabaseInitializationSettings settings = new DatabaseInitializationSettings();
-        settings.setSchemaLocations(
-                scriptLocations(properties.getSchemaLocations(), "schema", properties.getPlatform()));
-        settings.setDataLocations(scriptLocations(properties.getDataLocations(), "data", properties.getPlatform()));
-        settings.setContinueOnError(properties.isContinueOnError());
-        settings.setSeparator(properties.getSeparator());
-        settings.setEncoding(properties.getEncoding());
-        settings.setMode(properties.getMode());
+        if (Objects.nonNull(properties)) {
+            settings.setSchemaLocations(
+                    scriptLocations(properties.getSchemaLocations(), "spanner/schema", properties.getPlatform()));
+            settings.setDataLocations(scriptLocations(properties.getDataLocations(), "spanner/data", properties.getPlatform()));
+            settings.setContinueOnError(properties.isContinueOnError());
+            settings.setSeparator(properties.getSeparator());
+            settings.setEncoding(properties.getEncoding());
+            settings.setMode(properties.getMode());
+        }
         return settings;
     }
 
