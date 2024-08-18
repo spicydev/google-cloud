@@ -6,7 +6,7 @@ spring:
     gcp:
       pubsub:
         enabled: true
-        emulator-host: ${PUBSUB_EMULATOR_HOST}
+        emulator-host: localhost:8050
         project-id: mirchi-dev
       spanner:
         enabled: true
@@ -15,4 +15,4 @@ spring:
         database: dev-db
         emulator:
           enabled: true
-        emulator-host: ${SPANNER_EMULATOR_HOST}
+        emulator-host: localhost:9010
